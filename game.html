@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>NEON DRIFT — AI Street Racer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #07010f;
+      --magenta: #ff2bd6;
+      --cyan: #00f0ff;
+      --gold: #ffb347;
+      --purple: #7b2fff;
+      --ink: #f4e9ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Rajdhani, "Segoe UI", sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #app {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      background:
+        radial-gradient(ellipse at 50% 0%, #3a1060 0%, transparent 55%),
+        var(--bg);
+    }
+    #stage {
+      position: relative;
+      width: min(100vw, calc(100vh * 16 / 9));
+      height: min(100vh, calc(100vw * 9 / 16));
+      background: #000;
+      box-shadow: 0 0 80px #ff2bd655, 0 0 0 1px #ff2bd633;
+      overflow: hidden;
+    }
+    canvas { display: block; width: 100%; height: 100%; cursor: none; }
+    .screen {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(180deg, #07010fe6 0%, #1a0538cc 100%);
+      backdrop-filter: blur(2px);
+      padding: 24px;
+      text-align: center;
+      overflow: auto;
+    }
+    .screen.hidden { display: none; }
+    .logo {
+      font-family: Orbitron, sans-serif;
+      font-weight: 900;
+      font-size: clamp(40px, 8vw, 84px);
+      letter-spacing: 0.18em;
+      line-height: 0.95;
+      background: linear-gradient(180deg, #fff 0%, #00f0ff 35%, #ff2bd6 80%, #7b2fff 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      filter: drop-shadow(0 0 18px #ff2bd688);
+      margin-bottom: 6px;
+    }
+    .sub {
+      font-family: Orbitron, sans-serif;
+      letter-spacing: 0.46em;
+      font-size: 13px;
+      color: var(--cyan);
+      margin-bottom: 28px;
+    }
+    .hint { color: #cbb7e6; font-size: 18px; margin-top: 8px; }
+    .hint kbd {
+      font-family: Orbitron, sans-serif;
+      font-size: 12px;
+      padding: 3px 8px;
+      border: 1px solid #00f0ff88;
+      color: var(--cyan);
+      border-radius: 4px;
+      margin: 0 3px;
+    }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 22px; }
+    button, .chip {
+      font-family: Orbitron, sans-serif;
+      cursor: pointer;
+      border: 1px solid #00f0ff88;
+      background: #00f0ff14;
+      color: var(--cyan);
+      padding: 12px 22px;
+      border-radius: 4px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      transition: 0.15s ease;
+    }
+    button:hover, .chip:hover, .chip.on {
+      background: #ff2bd6;
+      border-color: #ff2bd6;
+      color: #fff;
+      box-shadow: 0 0 22px #ff2bd688;
+    }
+    button.primary {
+      background: linear-gradient(90deg, #ff2bd6, #7b2fff);
+      border: none; color: #fff; font-weight: 700; padding: 14px 28px;
+    }
+    .chip { padding: 7px 12px; font-size: 10px; }
+    .panel {
+      width: min(640px, 100%);
+      text-align: left;
+      background: #140428cc;
+      border: 1px solid #ff2bd644;
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 20px 60px #0008;
+    }
+    .panel h2 {
+      font-family: Orbitron, sans-serif;
+      font-size: 16px;
+      letter-spacing: 0.2em;
+      color: var(--magenta);
+      margin-bottom: 12px;
+    }
+    textarea, input[type="text"] {
+      width: 100%;
+      background: #07010f;
+      border: 1px solid #7b2fff88;
+      color: #fff;
+      font-family: Rajdhani, sans-serif;
+      font-size: 18px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      resize: none;
+      outline: none;
+    }
+    textarea:focus, input:focus { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan); }
+    .preview-wrap {
+      margin-top: 12px;
+      height: 180px;
+      border: 1px dashed #7b2fff66;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 70%, #2a1050, #07010f);
+      overflow: hidden; position: relative;
+    }
+    .preview-wrap img { max-height: 100%; max-width: 100%; object-fit: contain; }
+    .status { min-height: 22px; margin-top: 8px; color: var(--cyan); font-size: 15px; }
+    .scan {
+      position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(0deg, #0000 0 2px, #00f0ff0a 2px 4px);
+      animation: sweep 1.6s linear infinite;
+    }
+    @keyframes sweep {
+      0% { transform: translateY(-100%); } 100% { transform: translateY(100%); }
+    }
+    #hud {
+      position: absolute; inset: 0; pointer-events: none;
+      display: none;
+      font-family: Orbitron, sans-serif;
+    }
+    #hud.show { display: block; }
+    .hud-tl, .hud-tr, .hud-bl, .hud-br { position: absolute; padding: 14px 18px; }
+    .hud-tl { top: 0; left: 0; }
+    .hud-tr { top: 0; right: 0; text-align: right; }
+    .hud-bl { bottom: 54px; left: 0; }
+    .hud-br { bottom: 54px; right: 0; text-align: right; }
+    .label { font-size: 10px; letter-spacing: 0.28em; color: var(--cyan); opacity: 0.85; }
+    .value { font-size: 28px; font-weight: 700; color: #fff; text-shadow: 0 0 12px #00f0ff; }
+    .value.hot { color: var(--magenta); text-shadow: 0 0 12px #ff2bd6; }
+    #touch {
+      position: absolute; left: 0; right: 0; bottom: 8px;
+      display: none; justify-content: space-between; padding: 0 12px;
+      pointer-events: none;
+    }
+    #touch.show { display: flex; }
+    #touch button {
+      pointer-events: auto;
+      width: 74px; height: 74px; border-radius: 50%;
+      font-size: 22px; padding: 0;
+      background: #140428cc; color: #fff;
+    }
+    #nitroBtn { border-color: var(--magenta); color: var(--magenta); }
+    .tiny { font-size: 12px; color: #b9a3d4; margin-top: 10px; line-height: 1.4; }
+    a { color: var(--cyan); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="stage">
+      <canvas id="c" width="1280" height="720"></canvas>
+
+      <div id="title" class="screen">
+        <div class="logo">NEON<br/>DRIFT</div>
+        <div class="sub">AI STREET RACER</div>
+        <p class="hint">Generate a car with <strong>Stable Diffusion</strong>, then outrun the night.</p>
+        <div class="row">
+          <button class="primary" id="btnGarage">OPEN GARAGE</button>
+          <button id="btnQuick">QUICK RACE</button>
+        </div>
+        <p class="tiny">W / ↑ accelerate · A D / ← → steer · S / ↓ brake · SPACE nitro · P pause</p>
+        <p class="tiny">Open source · MIT · Powered by Gradio + SDXL Turbo</p>
+      </div>
+
+      <div id="garage" class="screen hidden">
+        <div class="panel">
+          <h2>AI GARAGE — STABLE DIFFUSION</h2>
+          <p class="tiny" style="margin-top:0;margin-bottom:10px">
+            Describe a car. We send your prompt to a public Stable Diffusion endpoint
+            (SDXL Turbo by Stability AI, or Flux) and paint a unique rear-view sprite.
+          </p>
+          <textarea id="prompt" rows="2" placeholder="e.g. chrome cyberpunk supercar with magenta neon underglow">magenta neon supercar, cyberpunk, chrome</textarea>
+          <div class="row" style="margin-top:10px; justify-content:flex-start">
+            <span class="chip on" data-preset="magenta neon supercar, cyberpunk, chrome">Cyber</span>
+            <span class="chip" data-preset="vintage American muscle car, candy red, wide body">Muscle</span>
+            <span class="chip" data-preset="formula one race car, livery, aggressive rear wing">F1</span>
+            <span class="chip" data-preset="pink Japanese drift car, huge spoiler, neon lights">JDM</span>
+            <span class="chip" data-preset="gold luxury hypercar, sleek, LED taillights">Hyper</span>
+            <span class="chip" data-preset="off-road rally truck, mud, roof lights">Rally</span>
+            <span class="chip" data-preset="retro police interceptor, blue and white, light bar">Police</span>
+            <span class="chip" data-preset="lowrider convertible, purple flake paint, chrome">Lowrider</span>
+          </div>
+          <div class="row" style="margin-top:10px; justify-content:flex-start">
+            <span class="chip on" data-model="turbo">SDXL Turbo</span>
+            <span class="chip" data-model="flux">Flux</span>
+          </div>
+          <div class="preview-wrap" id="previewWrap">
+            <span id="previewHint" class="tiny">Your car will appear here</span>
+            <img id="previewImg" alt="Generated car" style="display:none" />
+            <div class="scan hidden" id="scan"></div>
+          </div>
+          <div class="status" id="status"></div>
+          <div class="row" style="margin-top:12px">
+            <button class="primary" id="btnGen">GENERATE CAR</button>
+            <button id="btnRace">RACE</button>
+            <button id="btnBack">BACK</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="over" class="screen hidden">
+        <div class="logo" style="font-size:42px; letter-spacing:0.2em">WRECKED</div>
+        <p class="hint" id="overStats"></p>
+        <div class="row">
+          <button class="primary" id="btnRetry">RACE AGAIN</button>
+          <button id="btnOverGarage">NEW CAR</button>
+        </div>
+      </div>
+
+      <div id="pause" class="screen hidden">
+        <div class="logo" style="font-size:42px">PAUSED</div>
+        <p class="hint">Press <kbd>P</kbd> or click resume</p>
+        <div class="row">
+          <button class="primary" id="btnResume">RESUME</button>
+          <button id="btnQuit">QUIT TO TITLE</button>
+        </div>
+      </div>
+
+      <div id="hud">
+        <div class="hud-tl">
+          <div class="label">SCORE</div>
+          <div class="value" id="hudScore">0</div>
+        </div>
+        <div class="hud-tr">
+          <div class="label">HIGH</div>
+          <div class="value" id="hudHigh">0</div>
+        </div>
+        <div class="hud-bl">
+          <div class="label">NITRO</div>
+          <div class="value" id="hudNitro">100%</div>
+        </div>
+        <div class="hud-br">
+          <div class="label">SPEED</div>
+          <div class="value" id="hudSpeed">0</div>
+        </div>
+      </div>
+
+      <div id="touch">
+        <button id="leftBtn">◀</button>
+        <button id="nitroBtn">N₂O</button>
+        <button id="rightBtn">▶</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const W = 1280, H = 720;
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  const ROAD_W = 2000;
+  const SEG_LEN = 200;
+  const CAM_H = 1000;
+  const CAM_D = 0.84;
+  const DRAW = 170;
+  const N_SEGS = 2400;
+
+  const $ = (id) => document.getElementById(id);
+  const screens = {
+    title: $("title"),
+    garage: $("garage"),
+    over: $("over"),
+    pause: $("pause"),
+  };
+
+  let mode = "title"; // title | garage | play | pause | over
+  let model = "turbo";
+  let carImg = null;
+  let highScore = 0;
+  try { highScore = parseInt(localStorage.getItem("neonDriftHigh") || "0", 10) || 0; } catch (_) {}
+
+  const keys = {};
+  const hold = { left: false, right: false, nitro: false };
+
+  const player = {
+    x: 0, z: 0, speed: 0, y: 0,
+    maxSpeed: SEG_LEN * 62,
+    accel: SEG_LEN * 18,
+    breaking: SEG_LEN * 30,
+    offRoadDecel: SEG_LEN * 40,
+    offRoadLimit: SEG_LEN * 22,
+    centrifugal: 0.00028,
+    nitro: 1,
+    score: 0,
+    dist: 0,
+    tilt: 0,
+    lives: 3,
+  };
+
+  let segments = [];
+  let cars = [];
+  let shake = 0;
+  let sunPhase = 0;
+  let lastT = 0;
+  let demoZ = 0;
+
+  function show(name) {
+    Object.values(screens).forEach((el) => el.classList.add("hidden"));
+    if (name && screens[name]) screens[name].classList.remove("hidden");
+    $("hud").classList.toggle("show", name === null);
+    const touchy = matchMedia("(pointer: coarse)").matches;
+    $("touch").classList.toggle("show", name === null && touchy);
+  }
+
+  function rumbleColor(i) {
+    return i % 2 ? { road: "#1a1028", grass: "#12081c", rumble: "#ff2bd6", lane: "#00f0ffcc" }
+                 : { road: "#140820", grass: "#0c0514", rumble: "#00f0ff", lane: "#0000" };
+  }
+
+  function buildTrack() {
+    segments = [];
+    for (let i = 0; i < N_SEGS; i++) {
+      const seg = {
+        index: i,
+        p1: { x: 0, y: 0, z: i * SEG_LEN },
+        p2: { x: 0, y: 0, z: (i + 1) * SEG_LEN },
+        curve: 0,
+        y: 0,
+        color: rumbleColor(i),
+        sprites: [],
+      };
+      segments.push(seg);
+    }
+    const addCurve = (start, n, curve) => {
+      for (let i = 0; i < n; i++) segments[(start + i) % N_SEGS].curve = curve;
+    };
+    const addHill = (start, n, height) => {
+      for (let i = 0; i < n; i++) {
+        const t = i / n;
+        const y = Math.sin(t * Math.PI) * height;
+        segments[(start + i) % N_SEGS].p1.y = y;
+        segments[(start + i) % N_SEGS].p2.y = y;
+      }
+    };
+    addCurve(120, 180, 4);
+    addCurve(400, 140, -6);
+    addHill(400, 200, 1200);
+    addCurve(700, 220, 5);
+    addHill(900, 160, -800);
+    addCurve(1100, 200, -4);
+    addCurve(1500, 260, 7);
+    addHill(1500, 240, 1600);
+    addCurve(1900, 180, -5);
+    addHill(2100, 180, 900);
+    for (let i = 0; i < N_SEGS; i++) {
+      segments[i].p2.y = segments[(i + 1) % N_SEGS].p1.y;
+    }
+
+    for (let i = 8; i < N_SEGS; i += 6) {
+      const side = (i % 12 === 0) ? -1 : 1;
+      segments[i].sprites.push({
+        type: i % 18 === 0 ? "building" : "palm",
+        x: side * (1.4 + (i % 5) * 0.15),
+        hue: (i * 17) % 360,
+      });
+    }
+    spawnTraffic(true);
+  }
+
+  function spawnTraffic(reset) {
+    if (reset) cars = [];
+    const need = 40 - cars.length;
+    for (let i = 0; i < need; i++) {
+      cars.push({
+        z: Math.random() * N_SEGS * SEG_LEN,
+        x: [-0.7, -0.35, 0, 0.35, 0.7][Math.floor(Math.random() * 5)],
+        speed: player.maxSpeed * (0.22 + Math.random() * 0.35),
+        color: `hsl(${Math.random() * 360}, 90%, 58%)`,
+        w: 0.22 + Math.random() * 0.08,
+      });
+    }
+  }
+
+  function project(p, camX, camY, camZ) {
+    const dz = p.z - camZ;
+    const scale = CAM_D / Math.max(0.08, dz);
+    p.sx = W / 2 + scale * (p.x - camX) * (W / 2);
+    p.sy = H / 2 - scale * (p.y - camY) * (W / 2);
+    p.sw = scale * ROAD_W * (W / 2);
+    p.scale = scale;
+  }
+
+  function quad(x1, y1, x2, y2, x3, y3, x4, y4, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineTo(x3, y3);
+    ctx.lineTo(x4, y4);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function segAt(z) {
+    const i = Math.floor(z / SEG_LEN) % N_SEGS;
+    return segments[(i + N_SEGS) % N_SEGS];
+  }
+
+  function percent(z) {
+    return (z % SEG_LEN) / SEG_LEN;
+  }
+
+  function drawSky(curveShift) {
+    const g = ctx.createLinearGradient(0, 0, 0, H * 0.55);
+    g.addColorStop(0, "#07012a");
+    g.addColorStop(0.45, "#4b156e");
+    g.addColorStop(0.75, "#ff4e8a");
+    g.addColorStop(1, "#ffb347");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = "#fff8";
+    for (let i = 0; i < 80; i++) {
+      const x = ((i * 157 + curveShift * 0.02) % W + W) % W;
+      const y = (i * 83) % (H * 0.38);
+      ctx.fillRect(x, y, i % 5 === 0 ? 2 : 1, 1);
+    }
+
+    const sunX = W / 2 - curveShift * 0.15;
+    const sunY = H * 0.38;
+    const rg = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 160);
+    rg.addColorStop(0, "#ffe9a8");
+    rg.addColorStop(0.4, "#ff6b9a");
+    rg.addColorStop(1, "#ff6b9a00");
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 160, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffcf6b";
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 78, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#07012a";
+    for (let i = 0; i < 10; i++) {
+      ctx.fillRect(sunX - 80, sunY - 40 + i * 10, 160, 3 + i * 0.4);
+    }
+
+    ctx.fillStyle = "#140428";
+    ctx.beginPath();
+    ctx.moveTo(0, H * 0.5);
+    for (let i = 0; i <= 16; i++) {
+      const x = (i / 16) * W - curveShift * 0.2;
+      const y = H * 0.42 - Math.abs(Math.sin(i * 0.9 + 0.4)) * 90 - (i % 3) * 18;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W, H * 0.52);
+    ctx.lineTo(0, H * 0.52);
+    ctx.fill();
+  }
+
+  function drawPalm(x, y, s, flip) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(flip, 1);
+    ctx.fillStyle = "#2a1830";
+    ctx.fillRect(-4 * s, 0, 8 * s, -70 * s);
+    ctx.fillStyle = "#00c8a8";
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, -70 * s);
+      ctx.quadraticCurveTo((40 + i * 6) * s, (-50 + i * 4) * s, (55 + i * 8) * s, (-20 + i * 6) * s);
+      ctx.quadraticCurveTo(20 * s, -55 * s, 0, -70 * s);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0, -70 * s);
+      ctx.quadraticCurveTo((-35 - i * 5) * s, (-48 + i * 3) * s, (-50 - i * 7) * s, (-18 + i * 5) * s);
+      ctx.quadraticCurveTo(-16 * s, -55 * s, 0, -70 * s);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawBuilding(x, y, s, hue) {
+    const bw = 70 * s, bh = 160 * s;
+    ctx.fillStyle = `hsla(${hue}, 40%, 12%, 0.95)`;
+    ctx.fillRect(x - bw / 2, y - bh, bw, bh);
+    ctx.strokeStyle = `hsla(${hue}, 100%, 65%, 0.9)`;
+    ctx.lineWidth = Math.max(1, 2 * s);
+    ctx.strokeRect(x - bw / 2, y - bh, bw, bh);
+    ctx.fillStyle = `hsla(${(hue + 180) % 360}, 100%, 70%, 0.7)`;
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 3; c++) {
+        if ((r + c) % 2 === 0) ctx.fillRect(x - bw / 2 + 8 * s + c * 20 * s, y - bh + 12 * s + r * 28 * s, 10 * s, 14 * s);
+      }
+    }
+  }
+
+  function drawProcCar(x, y, scale, color, isPlayer) {
+    const w = 220 * scale, h = 110 * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(isPlayer ? 1 : 1, 1);
+    ctx.fillStyle = "#0008";
+    ctx.beginPath();
+    ctx.ellipse(0, 8 * scale, w * 0.45, 10 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.46, -h * 0.1);
+    ctx.lineTo(-w * 0.38, -h * 0.55);
+    ctx.lineTo(w * 0.38, -h * 0.55);
+    ctx.lineTo(w * 0.46, -h * 0.1);
+    ctx.lineTo(w * 0.34, h * 0.18);
+    ctx.lineTo(-w * 0.34, h * 0.18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#8fefffcc";
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.22, -h * 0.2);
+    ctx.lineTo(-w * 0.16, -h * 0.48);
+    ctx.lineTo(w * 0.16, -h * 0.48);
+    ctx.lineTo(w * 0.22, -h * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#ff2a55";
+    ctx.fillRect(-w * 0.42, -h * 0.08, w * 0.12, h * 0.1);
+    ctx.fillRect(w * 0.3, -h * 0.08, w * 0.12, h * 0.1);
+    ctx.fillStyle = "#1a1020";
+    ctx.fillRect(-w * 0.44, h * 0.02, w * 0.16, h * 0.16);
+    ctx.fillRect(w * 0.28, h * 0.02, w * 0.16, h * 0.16);
+    if (isPlayer) {
+      ctx.fillStyle = "#00f0ff";
+      ctx.fillRect(-w * 0.2, h * 0.05, w * 0.4, 3 * scale);
+    }
+    ctx.restore();
+  }
+
+  function drawAiCar(x, y, scale, img) {
+    const w = 260 * scale, h = 160 * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = "#0008";
+    ctx.beginPath();
+    ctx.ellipse(0, 10 * scale, w * 0.4, 12 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "screen";
+    ctx.drawImage(img, -w / 2, -h * 0.85, w, h);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.restore();
+  }
+
+  function renderWorld(camX, camY, camZ, playerOn) {
+    const base = segAt(camZ);
+    const start = base.index;
+    let x = 0, dx = 0;
+    let maxy = H;
+    const projected = [];
+
+    for (let n = 0; n < DRAW; n++) {
+      const seg = segments[(start + n) % N_SEGS];
+      const looped = start + n >= N_SEGS;
+      const camOff = looped ? N_SEGS * SEG_LEN : 0;
+      project(seg.p1, camX - x, camY, camZ - camOff);
+      project(seg.p2, camX - x - dx, camY, camZ - camOff);
+      x += dx;
+      dx += seg.curve;
+      projected.push({ seg, xCopy: x, dxCopy: dx });
+    }
+
+    const curveShift = projected.length ? projected[Math.min(40, projected.length - 1)].xCopy : 0;
+    drawSky(curveShift);
+
+    for (let n = DRAW - 1; n >= 0; n--) {
+      const { seg } = projected[n];
+      const p1 = seg.p1, p2 = seg.p2;
+      if (p1.sy >= p2.sy && p2.sy < maxy) {
+        const rum = 1.18;
+        quad(0, p1.sy, W, p1.sy, W, p2.sy, 0, p2.sy, seg.color.grass);
+        quad(p1.sx - p1.sw * rum, p1.sy, p1.sx + p1.sw * rum, p1.sy,
+             p2.sx + p2.sw * rum, p2.sy, p2.sx - p2.sw * rum, p2.sy, seg.color.rumble);
+        quad(p1.sx - p1.sw, p1.sy, p1.sx + p1.sw, p1.sy,
+             p2.sx + p2.sw, p2.sy, p2.sx - p2.sw, p2.sy, seg.color.road);
+        if (seg.color.lane !== "#0000") {
+          const lw1 = p1.sw * 0.03, lw2 = p2.sw * 0.03;
+          quad(p1.sx - lw1, p1.sy, p1.sx + lw1, p1.sy, p2.sx + lw2, p2.sy, p2.sx - lw2, p2.sy, seg.color.lane);
+        }
+        maxy = p2.sy;
+      }
+    }
+
+    for (let n = DRAW - 1; n >= 0; n--) {
+      const { seg } = projected[n];
+      const p1 = seg.p1;
+      const fog = n / DRAW;
+      ctx.globalAlpha = Math.min(1, 1.4 - fog);
+      for (const sp of seg.sprites) {
+        const sx = p1.sx + p1.sw * sp.x;
+        const sy = p1.sy;
+        const sc = p1.scale * 800;
+        if (sp.type === "palm") drawPalm(sx, sy, sc, sp.x < 0 ? -1 : 1);
+        else drawBuilding(sx, sy, sc * 1.2, sp.hue);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    const trackLen = N_SEGS * SEG_LEN;
+    for (const car of cars) {
+      let dz = car.z - camZ;
+      if (dz < 0) dz += trackLen;
+      if (dz > DRAW * SEG_LEN) continue;
+      const seg = segAt(car.z);
+      const p = { x: car.x * ROAD_W, y: seg.p1.y, z: car.z };
+      let cz = camZ;
+      if (car.z < camZ) cz -= trackLen;
+      project(p, camX, camY, cz);
+      if (p.sy > H || p.scale < 0.0004) continue;
+      drawProcCar(p.sx, p.sy, p.scale * 900, car.color, false);
+    }
+
+    if (playerOn) {
+      const steer = (keys.ArrowLeft || keys.a || keys.A || hold.left ? -1 : 0)
+                  + (keys.ArrowRight || keys.d || keys.D || hold.right ? 1 : 0);
+      ctx.save();
+      ctx.translate(W / 2 + shake * (Math.random() - 0.5), H - 70);
+      ctx.rotate(player.tilt + steer * 0.04);
+      if (carImg && carImg.complete && carImg.naturalWidth) drawAiCar(0, 0, 1.05, carImg);
+      else drawProcCar(0, 0, 1.05, "#ff2bd6", true);
+      if (player.nitro < 0.99 && (keys[" "] || hold.nitro) && player.nitro > 0.02) {
+        ctx.fillStyle = "#00f0ff";
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(-30, 20); ctx.lineTo(0, 70 + Math.random() * 30); ctx.lineTo(30, 20);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+    }
+  }
+
+  function overlap(a, b, pad) {
+    return Math.abs(a - b) < pad;
+  }
+
+  function resetRun() {
+    player.x = 0;
+    player.z = 0;
+    player.speed = player.maxSpeed * 0.25;
+    player.nitro = 1;
+    player.score = 0;
+    player.dist = 0;
+    player.tilt = 0;
+    player.lives = 3;
+    shake = 0;
+    spawnTraffic(true);
+  }
+
+  function startPlay() {
+    resetRun();
+    mode = "play";
+    show(null);
+    ensureAudio();
+  }
+
+  function gameOver() {
+    mode = "over";
+    if (player.score > highScore) {
+      highScore = player.score;
+      try { localStorage.setItem("neonDriftHigh", String(highScore)); } catch (_) {}
+    }
+    $("overStats").textContent = `Score ${fmt(player.score)}   ·   Distance ${Math.floor(player.dist / 200)} m   ·   Best ${fmt(highScore)}`;
+    show("over");
+  }
+
+  function fmt(n) { return Math.floor(n).toLocaleString(); }
+
+  function updatePlay(dt) {
+    const accel = keys.ArrowUp || keys.w || keys.W;
+    const brake = keys.ArrowDown || keys.s || keys.S;
+    const left = keys.ArrowLeft || keys.a || keys.A || hold.left;
+    const right = keys.ArrowRight || keys.d || keys.D || hold.right;
+    const nitro = (keys[" "] || hold.nitro) && player.nitro > 0;
+
+    const seg = segAt(player.z);
+    const speedPercent = player.speed / player.maxSpeed;
+    const dx = dt * 2.4 * (0.35 + speedPercent);
+
+    if (left) player.x -= dx;
+    if (right) player.x += dx;
+    player.x -= dx * speedPercent * seg.curve * player.centrifugal * 18;
+
+    if (nitro) {
+      player.speed += player.accel * 1.8 * dt;
+      player.nitro = Math.max(0, player.nitro - 0.28 * dt);
+    } else {
+      player.nitro = Math.min(1, player.nitro + 0.08 * dt);
+    }
+
+    if (accel) player.speed += player.accel * dt;
+    else if (brake) player.speed -= player.breaking * dt;
+    else player.speed -= player.accel * 0.15 * dt;
+
+    if (Math.abs(player.x) > 1) {
+      if (player.speed > player.offRoadLimit) player.speed -= player.offRoadDecel * dt;
+      shake = Math.max(shake, 6);
+      player.x = Math.max(-1.8, Math.min(1.8, player.x));
+    }
+
+    player.speed = Math.max(0, Math.min(player.maxSpeed * (nitro ? 1.22 : 1), player.speed));
+    const dz = player.speed * dt;
+    player.z += dz;
+    player.dist += dz;
+    const trackLen = N_SEGS * SEG_LEN;
+    if (player.z >= trackLen) player.z -= trackLen;
+
+    player.score += dz * (0.04 + speedPercent * 0.12) * (nitro ? 1.6 : 1);
+    player.tilt += ((left ? -0.08 : 0) + (right ? 0.08 : 0) - player.tilt) * 8 * dt;
+    shake *= 0.86;
+
+    for (const car of cars) {
+      car.z += car.speed * dt;
+      if (car.z >= trackLen) car.z -= trackLen;
+      let gap = car.z - player.z;
+      if (gap < -trackLen / 2) gap += trackLen;
+      if (gap > trackLen / 2) gap -= trackLen;
+      if (Math.abs(gap) < SEG_LEN * 1.2 && overlap(player.x, car.x, 0.32 + car.w * 0.15)) {
+        player.speed *= 0.35;
+        shake = 16;
+        player.lives -= 1;
+        car.z = player.z + SEG_LEN * (40 + Math.random() * 80);
+        boom();
+        if (player.lives <= 0) { gameOver(); return; }
+      } else if (Math.abs(gap) < SEG_LEN * 2 && overlap(player.x, car.x, 0.55) && player.speed > player.maxSpeed * 0.5) {
+        player.score += 40 * dt * 60;
+      }
+    }
+
+    $("hudScore").textContent = fmt(player.score);
+    $("hudHigh").textContent = fmt(highScore);
+    $("hudNitro").textContent = Math.round(player.nitro * 100) + "%";
+    $("hudNitro").classList.toggle("hot", nitro);
+    $("hudSpeed").textContent = Math.round((player.speed / player.maxSpeed) * 320);
+    enginePitch(speedPercent);
+  }
+
+  function renderPlay() {
+    const camZ = player.z;
+    const seg = segAt(player.z);
+    const camY = CAM_H + seg.p1.y;
+    const camX = player.x * ROAD_W;
+    ctx.save();
+    if (shake > 0.4) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    renderWorld(camX, camY, camZ, true);
+    ctx.restore();
+    for (let i = 0; i < player.lives; i++) {
+      ctx.fillStyle = "#ff2bd6";
+      ctx.fillRect(18 + i * 18, 86, 12, 12);
+    }
+  }
+
+  function renderDemo(dt) {
+    demoZ += SEG_LEN * 28 * dt;
+    const trackLen = N_SEGS * SEG_LEN;
+    if (demoZ >= trackLen) demoZ -= trackLen;
+    sunPhase += dt;
+    const seg = segAt(demoZ);
+    renderWorld(Math.sin(sunPhase * 0.3) * 200, CAM_H + seg.p1.y, demoZ, false);
+  }
+
+  function loop(t) {
+    const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
+    lastT = t;
+    if (mode === "play") {
+      updatePlay(dt);
+      if (mode === "play") renderPlay();
+    } else if (mode === "pause") {
+      renderPlay();
+    } else {
+      renderDemo(dt);
+    }
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------- audio ---------- */
+  let actx = null, engineOsc = null, engineGain = null, musicTimer = 0;
+  function ensureAudio() {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      actx = new AC();
+      engineOsc = actx.createOscillator();
+      const filt = actx.createBiquadFilter();
+      engineGain = actx.createGain();
+      engineOsc.type = "sawtooth";
+      filt.type = "lowpass";
+      filt.frequency.value = 400;
+      engineGain.gain.value = 0.0001;
+      engineOsc.connect(filt); filt.connect(engineGain); engineGain.connect(actx.destination);
+      engineOsc.start();
+      startMusic();
+    }
+    if (actx.state === "suspended") actx.resume();
+  }
+  function enginePitch(p) {
+    if (!engineOsc) return;
+    engineOsc.frequency.value = 60 + p * 180;
+    engineGain.gain.value = mode === "play" ? 0.03 + p * 0.04 : 0.0001;
+  }
+  function boom() {
+    if (!actx) return;
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.type = "square";
+    o.frequency.value = 90;
+    g.gain.value = 0.12;
+    o.connect(g); g.connect(actx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.35);
+    o.stop(actx.currentTime + 0.35);
+  }
+  function startMusic() {
+    if (!actx) return;
+    const notes = [36, 36, 43, 39, 36, 31, 34, 39];
+    let step = 0;
+    const beat = 0.22;
+    function tick() {
+      if (!actx) return;
+      const o = actx.createOscillator();
+      const g = actx.createGain();
+      const f = 440 * Math.pow(2, (notes[step % notes.length] - 69) / 12);
+      o.type = "triangle";
+      o.frequency.value = f;
+      g.gain.value = mode === "play" || mode === "title" ? 0.045 : 0.02;
+      o.connect(g); g.connect(actx.destination);
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.2);
+      o.stop(actx.currentTime + 0.22);
+      step++;
+      musicTimer = setTimeout(tick, beat * 1000);
+    }
+    tick();
+  }
+
+  /* ---------- AI image gen (client-side Stable Diffusion) ---------- */
+  function buildPrompt(text) {
+    const t = (text || "").trim() || "neon cyberpunk supercar";
+    return `cinematic rear view of a ${t}, entire car visible and centered, glowing taillights, studio product photo, pure black background, no people, no text, highly detailed vehicle`;
+  }
+
+  async function generateCar() {
+    const status = $("status");
+    const scan = $("scan");
+    const imgEl = $("previewImg");
+    const hint = $("previewHint");
+    const prompt = buildPrompt($("prompt").value);
+    const seed = Math.floor(Math.random() * 1e9);
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=${encodeURIComponent(model)}&width=512&height=512&nologo=true&seed=${seed}`;
+    status.textContent = model === "turbo"
+      ? "Running SDXL Turbo (Stable Diffusion)…"
+      : "Running Flux…";
+    scan.classList.remove("hidden");
+    $("btnGen").disabled = true;
+    try {
+      const img = new Image();
+      img.decoding = "async";
+      await new Promise((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("generation failed"));
+        img.src = url;
+      });
+      carImg = img;
+      imgEl.src = url;
+      imgEl.style.display = "block";
+      hint.style.display = "none";
+      status.textContent = "Car ready. Hit RACE.";
+    } catch (err) {
+      status.textContent = "Generation failed (network). You can still race a neon procedural car.";
+    } finally {
+      scan.classList.add("hidden");
+      $("btnGen").disabled = false;
+    }
+  }
+
+  /* ---------- ui wiring ---------- */
+  $("btnGarage").onclick = () => { mode = "garage"; show("garage"); ensureAudio(); };
+  $("btnQuick").onclick = () => startPlay();
+  $("btnBack").onclick = () => { mode = "title"; show("title"); };
+  $("btnRace").onclick = () => startPlay();
+  $("btnGen").onclick = () => generateCar();
+  $("btnRetry").onclick = () => startPlay();
+  $("btnOverGarage").onclick = () => { mode = "garage"; show("garage"); };
+  $("btnResume").onclick = () => { mode = "play"; show(null); };
+  $("btnQuit").onclick = () => { mode = "title"; show("title"); };
+
+  document.querySelectorAll("[data-preset]").forEach((el) => {
+    el.onclick = () => {
+      document.querySelectorAll("[data-preset]").forEach((c) => c.classList.remove("on"));
+      el.classList.add("on");
+      $("prompt").value = el.dataset.preset;
+    };
+  });
+  document.querySelectorAll("[data-model]").forEach((el) => {
+    el.onclick = () => {
+      document.querySelectorAll("[data-model]").forEach((c) => c.classList.remove("on"));
+      el.classList.add("on");
+      model = el.dataset.model;
+    };
+  });
+
+  window.addEventListener("keydown", (e) => {
+    keys[e.key] = true;
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+    if (e.key === "Enter" && mode === "title") startPlay();
+    if ((e.key === "p" || e.key === "P" || e.key === "Escape") && mode === "play") {
+      mode = "pause"; show("pause");
+    } else if ((e.key === "p" || e.key === "P" || e.key === "Escape") && mode === "pause") {
+      mode = "play"; show(null);
+    }
+  });
+  window.addEventListener("keyup", (e) => { keys[e.key] = false; });
+
+  function bindHold(id, prop) {
+    const el = $(id);
+    const down = (ev) => { ev.preventDefault(); hold[prop] = true; ensureAudio(); };
+    const up = (ev) => { ev.preventDefault(); hold[prop] = false; };
+    el.addEventListener("mousedown", down);
+    el.addEventListener("mouseup", up);
+    el.addEventListener("mouseleave", up);
+    el.addEventListener("touchstart", down, { passive: false });
+    el.addEventListener("touchend", up);
+  }
+  bindHold("leftBtn", "left");
+  bindHold("rightBtn", "right");
+  bindHold("nitroBtn", "nitro");
+
+  canvas.tabIndex = 0;
+  canvas.addEventListener("click", () => { ensureAudio(); canvas.focus(); });
+  document.body.addEventListener("pointerdown", ensureAudio, { once: true });
+  window.addEventListener("click", () => canvas.focus());
+
+  $("hudHigh").textContent = fmt(highScore);
+  buildTrack();
+  show("title");
+  requestAnimationFrame((t) => { lastT = t; loop(t); });
+})();
+</script>
+</body>
+</html>
